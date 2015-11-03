@@ -1,0 +1,82 @@
+FROM ubuntu
+MAINTAINER Michael Baudisch-McCabe <"mbmccabe@ca.ibm.ca">
+#June 25, 2015
+# This image is for running zookeeper on buemix
+
+RUN apt-get update
+RUN apt-get install curl -y
+RUN apt-get install vim -y
+RUN curl -L http://apache.mirror.iweb.ca/kafka/0.8.2.1/kafka_2.10-0.8.2.1.tgz > kafka_2.10-0.8.2.1.tgz
+RUN tar zxf kafka_2.10-0.8.2.1.tgz
+WORKDIR kafka_2.10-0.8.2.1
+
+
+# On some servers, it seems a swapfile must be created before zookeeper and kafka will run
+# However, it seems that Docker doesn't allow creation of swapfiles
+
+#RUN dd if=/dev/zero of=/swapfile bs=1G count=4
+#RUN chmod 600 /swapfile
+#RUN mkswap /swapfile
+#RUN swapon /swapfile
+#RUN sysctl vm.swappiness=10
+#RUN sysctl vm.vfs_cache_pressure=50
+
+RUN echo "deb http://dl.bintray.com/sbt/debian /" | sudo tee -a /etc/apt/sources.list.d/sbt.list
+RUN apt-get update
+RUN apt-get install sbt -y --force-yes   #but even with this, it will sometimes jam up
+RUN sbt update
+RUN sbt package
+
+RUN mkdir .ssh
+
+RUN echo ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAzzR5EIdvm3GGlPxX0xqoq/5/xQX1Hx5+icTsd3bmK9TIDxb6NhJ3v7DJRuQcZHcoD64k/OLlRTqCrBYrwWyqFlahXF7FfSKgQWN4J2A+OX1ul8RJZNwC2C3wx8oxtRx1OaaQDONHFfvrdKm0j27rFK3mFId6+Zuu6Fz59GWnFO/Ck0WUS3sE6eRKq3Qsqf3aW6iFsR712p5t+SQdvJIy+V7QLxHSfI281vbpMkpIFd/xuMGKu97otAhhySqvYcISd7BlC73s1DZ5hRO7QkbeuqacH8604UaI6lCb/MbQZTdDhIIxcZVhaNvXszIJDlNbVXGTXy/TodkmzpvHhVvbfw== michael@oc7560176625.ibm.com > .ssh/cloud.key.pub
+
+RUN cp .ssh/cloud.key.pub .ssh/authorized_keys
+
+#RUN cp cloud.key.pub /root/.ssh/cloud.key.pub
+#RUN cat /root/.ssh/cloud.key.pub >> /root/.ssh/authorized_keys
+
+
+#VOLUME startfile
+
+EXPOSE 2181
+#EXPOSE 9092
+#EXPOSE 9093
+#EXPOSE 9094
+EXPOSE 22
+
+CMD ["bin/zookeeper-server-start.sh", "config/zookeeper.properties"]
+
+
+
+#Notes for myself and how I will use this:
+# To build the image, use the following
+# docker build -t zookeeper .
+# Then, to create a container, use:
+# docker run --rm -v /home/:/home/ -i -t --name="zookeeper" -p 2181:2181 -p 9092:9092 -p 9093:9093 -p 9094:9094 zookeeper /bin/bash
+# docker run --rm -v /home/:/home/ -i -t --name="zookeeper" -p 2181:2181  zookeeper
+# But the main purpose of this container is to run zookeeper in bluemix without anymore interaction. Good luck with that.
+
+
+
+
+
+# Then type the following to get started:
+# you might have to cd into the kafka_2.10-0.8.2.1 directory first
+# screen     ENTER
+# bin/zookeeper-server-start.sh config/zookeper.properties 
+# ctrl+a  Shift+a    give it a name (ie.zookeeper, kafka-0, kafka-1, kafka-2)  ENTER
+# then you ctrl+a+c to start new screen 
+# ctrl+a  Shift+a    give it a name (ie.zookeeper, kafka-0, kafka-1, kafka-2)  ENTER
+#  bin/kafka-server-start.sh config/server.properties
+# then you ctrl+a+c to start new screen 
+# ctrl+a  Shift+a    give it a name (ie.zookeeper, kafka-0, kafka-1, kafka-2)  ENTER
+#  bin/kafka-server-start.sh config/server-1.properties
+# then you ctrl+a+c to start new screen 
+# ctrl+a  Shift+a    give it a name (ie.zookeeper, kafka-0, kafka-1, kafka-2)  ENTER
+#  bin/kafka-server-start.sh config/server-2.properties
+# then ctrl+a+d and that should close the screen and 
+# leave the servers running
+# you should be able to close the terminal if you want. using CTRL+p, CTRL+q
+# To reattach screen, type screen -ls and make note of the number of the screen
+# then, type screen -r <number you just saw>

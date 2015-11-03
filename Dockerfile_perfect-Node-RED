@@ -1,0 +1,54 @@
+FROM ubuntu:14.04
+MAINTAINER Michael Baudisch-McCabe <"mbmccabe@ca.ibm.ca">
+
+RUN apt-get update && apt-get install apt-transport-https -y \
+    curl -y \
+    git-core -y \ 
+    build-essential -y \
+    openssl -y \
+    libssl-dev -y \ 
+&&  mkdir node
+
+WORKDIR /home/node/
+
+RUN git clone https://github.com/joyent/node.git
+
+WORKDIR /home/node/node
+
+RUN git tag \ 
+    && git checkout v0.10.36 
+RUN apt-get install python -y
+RUN  chmod 755 configure 
+RUN  ./configure  
+RUN   make \
+     && make install \
+     && curl -L https://npmjs.org/install.sh | sh
+
+
+WORKDIR /home/node
+RUN npm install -g node-red
+
+#RUN npm install -g node-red-contrib-kafka-node
+COPY node-red-contrib-kafka-node/ /usr/local/lib/node_modules/node-red/node_modules/node-red-contrib-kafka-node/
+COPY example-dot-config.json /root/.node-red/.config.json
+
+RUN npm install -g ibm_db 
+RUN npm install -g node-red-node-cf-cloudant
+RUN npm install -g node-red-nodes-cf-sqldb-dashdb
+
+EXPOSE 1880
+
+CMD echo "node-red" | sh
+
+
+#you can now access node red through a browser pointed at http://localhost:1880
+
+#Notes for myself and how I will use this:
+# To build the image, use the following
+# docker build -t nodered .
+# Then, to create a container, be in the node subdirectory and use:
+# docker run  -p 1880:1880 --name="node-red" nodered
+# This one below will run node-RED daemonized 
+# docker run --rm=false -d -p 1880:1880 --name="nodered" nodered
+
+

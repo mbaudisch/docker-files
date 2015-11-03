@@ -1,0 +1,27 @@
+FROM ubuntu
+
+RUN apt-get update
+RUN apt-get upgrade -y
+RUN apt-get install vim -y
+RUN apt-get install curl -y
+RUN apt-get install wget -y
+RUN wget -qO - http://packages.confluent.io/deb/1.0/archive.key | sudo apt-key add - 
+RUN echo "deb [arch=all] http://packages.confluent.io/deb/1.0 stable main" >> /etc/apt/sources.list
+RUN apt-get install openjdk-7-jdk -y
+RUN apt-get update && sudo apt-get install confluent-platform-2.10.4 -y
+
+RUN apt-get install supervisor -y
+
+COPY config/ config/
+COPY supervisord.conf /etc/supervisord.conf
+
+EXPOSE 2181
+EXPOSE 9092
+EXPOSE 9093
+EXPOSE 9094
+
+
+CMD echo "/usr/bin/supervisord -c /etc/supervisord.conf" | sh
+
+
+

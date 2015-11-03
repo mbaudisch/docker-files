@@ -1,0 +1,30 @@
+FROM ubuntu
+MAINTAINER  Michael Baudisch-McCabe   mbmccabe@ca.ibm.com
+
+RUN apt-get update
+RUN apt-get install apt-transport-https -y
+RUN apt-get install python -y
+RUN apt-get install python-pip -y
+RUN apt-get install curl -y
+RUN apt-get install build-essential -y
+RUN apt-get install git-core -y
+RUN apt-get install python-dev -y
+RUN apt-get install openssl -y
+RUN apt-get install libssl-dev -y
+RUN apt-get install vim -y
+RUN apt-get install screen -y
+
+
+RUN apt-get update
+RUN pip install ibm_db
+RUN pip install flask
+RUN pip install PyWavelets
+RUN pip install pandas
+RUN pip install pykafka
+
+#/home/dockwork/:/home/dockwork/
+
+VOLUME ~/startfile
+
+EXPOSE 5000
+

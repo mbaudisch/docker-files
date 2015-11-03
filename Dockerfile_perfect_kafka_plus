@@ -1,0 +1,140 @@
+FROM ubuntu
+MAINTAINER Michael Baudisch-McCabe <"mbmccabe@ca.ibm.ca">
+#November 1, 2015
+
+RUN apt-get update 
+#RUN apt-get upgrade -y
+
+
+RUN apt-get install curl -y \
+                    vim -y 
+
+RUN curl -L http://apache.mirror.iweb.ca/kafka/0.8.2.1/kafka_2.10-0.8.2.1.tgz > kafka_2.10-0.8.2.1.tgz &&  tar zxf kafka_2.10-0.8.2.1.tgz
+
+WORKDIR kafka_2.10-0.8.2.1
+RUN apt-get update 
+RUN apt-get install openjdk-7-jdk -y --fix-missing \
+# At the moment, I am not sure if I actually need the python modules but for
+# some things, the python-dev is needed (I thihnk they are panda-related)
+                    python -y \
+                    python-dev -y \
+                    build-essential -y \ 
+                    openssl -y \
+                    libssl-dev -y \
+# You can also install supervisor using pip but I found the apt-get version
+# functions better or at least functions for me
+                    python-pip -y \
+# don't really need htop but it is helpful to debug containers
+                    htop \
+# need supervisor to run numerous instance of kafka servers while in
+# one container; this is necessary because Bluemix only gives you one IP per 
+# container at a time
+                    supervisor -y 
+
+RUN apt-get install python-pandas -y
+                   
+RUN pip install ibm_db  
+# This is included to connect to dash-db
+RUN pip install flask   
+# This is included to POST to PM Service
+
+RUN pip install PyWavelets 
+RUN pip install pykafka   
+# This is included to utilize simple consumer
+RUN pip install kafka-python
+#RUN mkdir -p /etc/supervisor/conf.d/
+
+COPY config/ config/   
+# These are used when planning to run kafka servers and the server.properties files must reflect local conditions
+COPY WDProcessor2.py WDProcessor2.py
+COPY PMProcessor.py PMProcessor.py
+
+COPY supervisord.conf /etc/supervisord.conf   
+ # This file must identify which files you wish to run daemonized 
+                                                #  (ie. zookeeper, kafka, kafka1, kafka1,  or WDProcessing, PM Processing)
+ 
+#Note:  all the variables that kafka servers need and usually get through the 
+#       config/server.properities files "seem" to need to be passed to those
+#       instances via the supervisord.conf file. So, in addition to to adjusting
+#       the files in the confif folder to reflect the server IP, you should also
+#       adjust the supervisord.conf file as well.
+
+# On some servers, it seems a swapfile must be created before zookeeper and kafka will run
+# However, it seems that Docker doesn't allow creation of swapfiles
+
+#RUN dd if=/dev/zero of=/swapfile bs=1G count=4
+#RUN chmod 600 /swapfile
+#RUN mkswap /swapfile
+#RUN swapon /swapfile
+#RUN sysctl vm.swappiness=10
+#RUN sysctl vm.vfs_cache_pressure=50
+
+RUN echo "deb http://dl.bintray.com/sbt/debian /" | sudo tee -a /etc/apt/sources.list.d/sbt.list 
+RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 99E82A75642AC823
+RUN  apt-get update
+# I belieive the sbt module is needed for kafka to function though anymore
+RUN  apt-get install sbt -y --force-yes 
+ # but even with --force-yes, it will sometimes jam up
+RUN sbt update 
+RUN sbt package
+# screen is installed if you want to run multiple instances manually
+RUN apt-get install screen
+# The .ssh folder and files are created to enable logging into the container
+#  through bluemix though I haven't been able to be successful at that yet.
+# Apparently they will be adding an exec function to the containers soon
+
+RUN mkdir .ssh
+
+RUN echo ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAzzR5EIdvm3GGlPxX0xqoq/5/xQX1Hx5+icTsd3bmK9TIDxb6NhJ3v7DJRuQcZHcoD64k/OLlRTqCrBYrwWyqFlahXF7FfSKgQWN4J2A+OX1ul8RJZNwC2C3wx8oxtRx1OaaQDONHFfvrdKm0j27rFK3mFId6+Zuu6Fz59GWnFO/Ck0WUS3sE6eRKq3Qsqf3aW6iFsR712p5t+SQdvJIy+V7QLxHSfI281vbpMkpIFd/xuMGKu97otAhhySqvYcISd7BlC73s1DZ5hRO7QkbeuqacH8604UaI6lCb/MbQZTdDhIIxcZVhaNvXszIJDlNbVXGTXy/TodkmzpvHhVvbfw== michael@oc7560176625.ibm.com > .ssh/cloud.key.pub
+
+RUN cp .ssh/cloud.key.pub .ssh/authorized_keys
+
+#RUN cp cloud.key.pub /root/.ssh/cloud.key.pub
+#RUN cat /root/.ssh/cloud.key.pub >> /root/.ssh/authorized_keys
+
+#VOLUME startfile
+
+EXPOSE 2181
+EXPOSE 9092
+EXPOSE 9093
+EXPOSE 9094
+EXPOSE 5000
+EXPOSE 22
+
+#CMD ["bin/kafka-server-start.sh", "config/server-1.properties"]
+#CMD ["sh","-c","/usr/bin/supervisord","-c","/etc/supervisord.conf"]
+CMD echo "/usr/bin/supervisord -c /etc/supervisord.conf" | sh
+# The above command appears to the be the only version that actually works even
+# though the two above are syntactically correct and the recommended style
+
+#Notes for myself and how I will use this:
+# To build the image, use the following
+# docker build -t kafka .
+# Then, to create a container, use:
+# docker run -d --name="WDPM" -p 2181:2181 -p 9092:9092 -p 9093:9093 -p 9094:9094 kafka 
+
+#  -+-+-+-+-+-+-__-+-__-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+# If you want to run screen and kafka servers manually:
+#  type the following to get started:
+# you might have to cd into the kafka_2.10-0.8.2.1 directory first
+# screen     ENTER
+# bin/zookeeper-server-start.sh config/zookeper.properties 
+# ctrl+a  Shift+a    give it a name (ie.zookeeper, kafka-0, kafka-1, kafka-2)  ENTER
+# then you ctrl+a+c to start new screen 
+# ctrl+a  Shift+a    give it a name (ie.zookeeper, kafka-0, kafka-1, kafka-2)  ENTER
+#  bin/kafka-server-start.sh config/server.properties
+# then you ctrl+a+c to start new screen 
+# ctrl+a  Shift+a    give it a name (ie.zookeeper, kafka-0, kafka-1, kafka-2)  ENTER
+#  bin/kafka-server-start.sh config/server-1.properties
+# then you ctrl+a+c to start new screen 
+# ctrl+a  Shift+a    give it a name (ie.zookeeper, kafka-0, kafka-1, kafka-2)  ENTER
+#  bin/kafka-server-start.sh config/server-2.properties
+# then ctrl+a+d and that should close the screen and 
+# leave the servers running
+# you should be able to close the terminal if you want. using CTRL+p, CTRL+q
+# To reattach screen, type screen -ls and make note of the number of the screen
+# then, type screen -r <number you just saw>
+
+#I have found, however, this works once, to get the container running and the servers runinng. 
+# But if you need to go back in and make adjustments, the screens will not let you access them again,
+# unless you use "attach" not "exec"

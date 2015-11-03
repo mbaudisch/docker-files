@@ -1,0 +1,7 @@
+to create a new image for bluemix, use wdpm
+make sure you use the correct supervisord.conf
+the program in the WDPM part needs the subdirectory path    /kafka_2.10-0.8.2.1/WDThread.py
+
+The config/ directory should contain the server,properties files which indicate where to find zookeeper which depends on the IP addresses given by bluemix
+
+You must also make sure that the WDThread.py and PMProcessor.py reflect which server you ar4e aiming at
